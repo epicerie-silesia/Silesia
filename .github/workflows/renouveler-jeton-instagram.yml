@@ -1,0 +1,51 @@
+# ---------------------------------------------------------------------------
+# Renouvellement automatique du jeton Instagram
+#
+# Un jeton Instagram « longue durée » est valable 60 jours. Il peut être prolongé
+# de 60 jours tant qu'il est encore valide. Ce workflow le prolonge chaque lundi.
+#
+# Si Instagram renvoie un nouveau jeton, il est enregistré automatiquement dans
+# le secret IG_ACCESS_TOKEN, à condition d'avoir créé le secret GH_PAT
+# (voir GUIDE.md, partie 4, étape 6 ; dépannage : partie 6).
+# ---------------------------------------------------------------------------
+name: Renouveler le jeton Instagram
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  renouveler:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prolonger le jeton
+        env:
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$IG_ACCESS_TOKEN" ]; then
+            echo "Aucun jeton Instagram configuré : rien à faire."
+            exit 0
+          fi
+          resp=$(curl -sS "https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${IG_ACCESS_TOKEN}")
+          new=$(echo "$resp" | jq -r '.access_token // empty')
+          if [ -z "$new" ]; then
+            echo "::error::Instagram a refusé de prolonger le jeton : $(echo "$resp" | jq -r '.error.message // "réponse inattendue"'). Créez un nouveau jeton (GUIDE.md, partie 4)."
+            exit 1
+          fi
+          echo "::add-mask::$new"
+          days=$(( $(echo "$resp" | jq -r '.expires_in') / 86400 ))
+          echo "Jeton prolongé : valable encore ${days} jours."
+          if [ "$new" != "$IG_ACCESS_TOKEN" ]; then
+            if [ -z "$GH_TOKEN" ]; then
+              echo "::error::Instagram a fourni un nouveau jeton, mais le secret GH_PAT n'est pas configuré : impossible de l'enregistrer. Voir GUIDE.md, partie 4, étape 6."
+              exit 1
+            fi
+            gh secret set IG_ACCESS_TOKEN --repo "$REPO" --body "$new"
+            echo "Nouveau jeton enregistré dans le secret IG_ACCESS_TOKEN."
+          fi

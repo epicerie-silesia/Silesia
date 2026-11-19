@@ -1,0 +1,105 @@
+# ---------------------------------------------------------------------------
+# Publication du site sur GitHub Pages + synchronisation Instagram
+#
+# Se déclenche :
+#   - à chaque modification du site (push sur la branche main) ;
+#   - automatiquement toutes les 6 heures (nouvelles publications Instagram) ;
+#   - à la demande : onglet « Actions » > « Publier le site » > « Run workflow ».
+#
+# Gratuit : GitHub Actions est illimité pour les dépôts publics.
+# ---------------------------------------------------------------------------
+name: Publier le site
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # enregistrer les nouvelles photos Instagram dans le dépôt
+  pages: write      # publier sur GitHub Pages
+  id-token: write
+
+concurrency:
+  group: publication
+  cancel-in-progress: false
+
+jobs:
+  publier:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploiement.outputs.page_url }}
+    env:
+      IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+    steps:
+      - name: Récupérer les fichiers du site
+        uses: actions/checkout@v4
+
+      - name: Installer Python
+        if: env.IG_ACCESS_TOKEN != ''
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Synchroniser Instagram
+        id: instagram
+        if: env.IG_ACCESS_TOKEN != ''
+        continue-on-error: true
+        run: |
+          pip install --quiet "pillow>=10,<13"
+          python scripts/instagram_sync.py
+
+      - name: Enregistrer les nouvelles publications
+        id: enregistrer
+        if: steps.instagram.outcome == 'success'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html data/instagram.json assets/instagram
+          if git diff --cached --quiet; then
+            echo "Aucune nouvelle publication Instagram."
+          else
+            git commit -m "Instagram : mise à jour automatique de la galerie"
+            git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Lors des vérifications automatiques (toutes les 6 h), on ne republie le site
+      # que si de nouvelles photos sont arrivées.
+      - name: Configurer GitHub Pages
+        id: pages
+        if: github.event_name != 'schedule' || steps.enregistrer.outputs.changed == 'true'
+        uses: actions/configure-pages@v5
+
+      - name: Préparer les fichiers à publier
+        if: steps.pages.outcome == 'success'
+        run: |
+          mkdir -p _site
+          rsync -a --exclude '.git' --exclude '.github' --exclude 'scripts' --exclude '_site' \
+                   --exclude '*.md' --exclude '_test-*' --exclude 'Photos_*' --exclude 'Logo_*' ./ _site/
+          # Remplace l'adresse provisoire par l'adresse réelle du site
+          # (ex. https://votre-compte.github.io/silesia ou votre nom de domaine)
+          SITE_URL="${{ steps.pages.outputs.base_url }}"
+          find _site -type f \( -name '*.html' -o -name '*.xml' -o -name '*.txt' \) \
+               -exec sed -i "s#https://SITE-URL#${SITE_URL}#g" {} +
+          echo "Adresse du site : ${SITE_URL}"
+
+      - name: Envoyer les fichiers
+        if: steps.pages.outcome == 'success'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Mettre en ligne
+        id: deploiement
+        if: steps.pages.outcome == 'success'
+        uses: actions/deploy-pages@v4
+
+      - name: Signaler un problème Instagram
+        if: steps.instagram.outcome == 'failure'
+        run: |
+          echo "::error::La synchronisation Instagram a échoué (détails dans l'étape « Synchroniser Instagram »). Le site a bien été publié, avec les dernières photos connues. Cause la plus fréquente : jeton expiré, voir GUIDE.md, partie 6."
+          exit 1

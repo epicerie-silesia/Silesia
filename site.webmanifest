@@ -1,0 +1,14 @@
+{
+  "name": "Silesia – Épicerie polonaise",
+  "short_name": "Silesia",
+  "lang": "fr",
+  "start_url": "./",
+  "display": "browser",
+  "background_color": "#FBF7F0",
+  "theme_color": "#6E1423",
+  "icons": [
+    { "src": "assets/img/logo-silesia-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/img/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "assets/img/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}

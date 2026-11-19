@@ -1,0 +1,12 @@
+# Fichiers locaux à ne pas publier
+# Photos originales (HEIC lourds, contenant la position GPS) : seules les versions
+# optimisées de assets/img/ sont publiées.
+Photos_Local/
+Photos_Produits/
+Logo_Silesia/
+_site/
+_test-*.html
+__pycache__/
+*.tmp
+.DS_Store
+Thumbs.db

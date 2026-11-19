@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+  <!-- Treillis discret façon point de croix, utilisé en fond très léger -->
+  <g fill="none" stroke="#6E1423" stroke-opacity=".07" stroke-width="1">
+    <path d="M24 4 44 24 24 44 4 24Z"/>
+  </g>
+  <g fill="#6E1423" fill-opacity=".09">
+    <path d="M24 20l4 4-4 4-4-4z"/>
+    <circle cx="0" cy="0" r="1.6"/><circle cx="48" cy="0" r="1.6"/>
+    <circle cx="0" cy="48" r="1.6"/><circle cx="48" cy="48" r="1.6"/>
+  </g>
+</svg>
